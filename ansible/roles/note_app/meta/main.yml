@@ -1,0 +1,20 @@
+galaxy_info:
+  role_name: note_app
+  author: your_name
+  description: Deploy the Flask Note Taking app with SQLite and systemd (Gunicorn)
+  license: MIT
+  min_ansible_version: '2.13'
+  platforms:
+    - name: EL
+      versions: ['9']
+  galaxy_tags:
+    - flask
+    - sqlite
+    - systemd
+    - gunicorn
+    - web
+    - notes
+
+dependencies: []
+
+

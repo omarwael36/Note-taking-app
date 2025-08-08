@@ -1,0 +1,7 @@
+- name: restart noteapp
+  ansible.builtin.systemd:
+    name: "{{ note_app_service_name }}"
+    state: restarted
+    daemon_reload: true
+
+

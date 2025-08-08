@@ -1,0 +1,98 @@
+- name: Ensure app group exists
+  ansible.builtin.group:
+    name: "{{ note_app_group }}"
+    state: present
+
+- name: Ensure app user exists
+  ansible.builtin.user:
+    name: "{{ note_app_user }}"
+    group: "{{ note_app_group }}"
+    system: true
+    create_home: false
+    shell: /sbin/nologin
+
+- name: Ensure base directory exists
+  ansible.builtin.file:
+    path: "{{ note_app_base_dir }}"
+    state: directory
+    owner: "{{ note_app_user }}"
+    group: "{{ note_app_group }}"
+    mode: '0755'
+
+- name: Install system packages
+  ansible.builtin.package:
+    name:
+      - git
+      - python3
+      - python3-pip
+      - python3-virtualenv
+    state: present
+
+- name: Checkout repository
+  ansible.builtin.git:
+    repo: "{{ note_app_repo_url }}"
+    dest: "{{ note_app_base_dir }}/src"
+    version: "{{ note_app_repo_version }}"
+    update: yes
+  when: note_app_repo_url | length > 0
+
+- name: Ensure virtualenv exists
+  ansible.builtin.command:
+    cmd: "{{ note_app_python }} -m venv {{ note_app_venv_dir }}"
+    creates: "{{ note_app_venv_dir }}/bin/activate"
+
+- name: Install Python dependencies
+  ansible.builtin.pip:
+    requirements: "{{ note_app_base_dir }}/src/requirements.txt"
+    virtualenv: "{{ note_app_venv_dir }}"
+
+- name: Ensure gunicorn is installed (in venv)
+  ansible.builtin.pip:
+    name: gunicorn
+    virtualenv: "{{ note_app_venv_dir }}"
+
+- name: Create .env file
+  ansible.builtin.template:
+    src: env.j2
+    dest: "{{ note_app_base_dir }}/src/.env"
+    owner: "{{ note_app_user }}"
+    group: "{{ note_app_group }}"
+    mode: '0640'
+  notify: restart noteapp
+
+- name: Create systemd service
+  ansible.builtin.template:
+    src: noteapp.service.j2
+    dest: "/etc/systemd/system/{{ note_app_service_name }}.service"
+    mode: '0644'
+  notify: restart noteapp
+
+- name: Allow python to bind to low port (80)
+  ansible.builtin.command: setcap 'cap_net_bind_service=+ep' {{ note_app_venv_dir }}/bin/python3
+  changed_when: false
+  failed_when: false
+
+- name: Ensure database file exists
+  ansible.builtin.file:
+    path: "{{ note_app_base_dir }}/src/app.db"
+    state: touch
+    owner: "{{ note_app_user }}"
+    group: "{{ note_app_group }}"
+    mode: '0640'
+
+- name: Initialize database tables
+  ansible.builtin.command:
+    cmd: "{{ note_app_venv_dir }}/bin/python scripts/init_db.py"
+    chdir: "{{ note_app_base_dir }}/src"
+  environment:
+    FLASK_CONFIG: "{{ note_app_flask_config }}"
+  changed_when: false
+
+- name: Enable and start service
+  ansible.builtin.systemd:
+    name: "{{ note_app_service_name }}"
+    enabled: true
+    state: started
+    daemon_reload: true
+
+

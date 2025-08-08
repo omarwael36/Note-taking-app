@@ -1,0 +1,15 @@
+note_app_user: noteapp
+note_app_group: noteapp
+note_app_base_dir: /opt/noteapp
+note_app_venv_dir: "{{ note_app_base_dir }}/venv"
+note_app_repo_url: ''  # Set externally
+note_app_repo_version: main
+note_app_service_name: noteapp
+note_app_bind_host: 0.0.0.0
+note_app_bind_port: 80
+note_app_secret_key: change-me
+note_app_flask_config: production
+note_app_env_extra: {}
+note_app_python: python3
+
+

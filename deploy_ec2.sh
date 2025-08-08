@@ -16,37 +16,7 @@ echo "🔧 Installing Python, Git, and development tools..."
 sudo dnf install -y python3 python3-pip python3-devel git curl wget
 sudo dnf groupinstall -y "Development Tools"
 
-# Install MariaDB
-echo "🗄️ Installing MariaDB..."
-sudo dnf install -y mariadb-server mariadb-devel
-
-# Start and enable MariaDB
-echo "▶️ Starting MariaDB service..."
-sudo systemctl start mariadb
-sudo systemctl enable mariadb
-
-# Secure MariaDB installation (automated)
-echo "🔒 Securing MariaDB installation..."
-sudo mysql_secure_installation <<EOF
-
-y
-MariaDB123!
-MariaDB123!
-y
-y
-y
-y
-EOF
-
-# Create database and user
-echo "🏗️ Creating database and user..."
-sudo mysql -u root -pMariaDB123! <<EOF
-CREATE DATABASE IF NOT EXISTS noteapp CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-CREATE USER IF NOT EXISTS 'noteapp'@'localhost' IDENTIFIED BY 'NoteApp2024!';
-GRANT ALL PRIVILEGES ON noteapp.* TO 'noteapp'@'localhost';
-FLUSH PRIVILEGES;
-EXIT;
-EOF
+echo "ℹ️ Skipping MariaDB installation (using SQLite by default)"
 
 # Clone the repository
 echo "📥 Cloning Note Taking App repository..."
@@ -62,43 +32,22 @@ source venv/bin/activate
 # Install Python dependencies
 echo "📚 Installing Python dependencies..."
 pip install --upgrade pip
-pip install Flask Flask-SQLAlchemy python-dotenv PyMySQL gunicorn
+pip install Flask Flask-SQLAlchemy python-dotenv gunicorn
 
-# Create .env file for production
 echo "⚙️ Creating production environment configuration..."
 cat > .env << EOF
 # Flask Configuration
 SECRET_KEY=$(python3 -c 'import secrets; print(secrets.token_hex(32))')
 FLASK_CONFIG=production
 
-# Database Configuration
-MYSQL_HOST=localhost
-MYSQL_PORT=3306
-MYSQL_USER=noteapp
-MYSQL_PASSWORD=NoteApp2024!
-MYSQL_DATABASE=noteapp
+# Database Configuration (SQLite default)
+# DATABASE_URL=sqlite:////home/ec2-user/Note-taking-app/app.db
 
 # Server Configuration
 PORT=80
 EOF
 
-# Test database connection
-echo "🔍 Testing database connection..."
-python3 -c "
-import pymysql
-try:
-    connection = pymysql.connect(
-        host='localhost',
-        user='noteapp',
-        password='NoteApp2024!',
-        database='noteapp'
-    )
-    print('✅ Database connection successful!')
-    connection.close()
-except Exception as e:
-    print(f'❌ Database connection failed: {e}')
-    exit(1)
-"
+echo "ℹ️ Skipping DB connectivity test (SQLite)"
 
 # Initialize database tables
 echo "🏗️ Creating database tables..."
@@ -111,7 +60,7 @@ echo "🚀 Setting up production service..."
 sudo tee /etc/systemd/system/noteapp.service > /dev/null << EOF
 [Unit]
 Description=Note Taking App
-After=network.target mariadb.service
+After=network.target
 
 [Service]
 User=ec2-user
@@ -134,10 +83,7 @@ sudo chown ec2-user:ec2-user /backup
 cp scripts/backup_db.sh /home/ec2-user/
 chmod +x /home/ec2-user/backup_db.sh
 
-# Add environment variables to backup script
-sed -i 's/DB_NAME="noteapp"/DB_NAME="noteapp"/' /home/ec2-user/backup_db.sh
-sed -i 's/DB_USER="noteapp"/DB_USER="noteapp"/' /home/ec2-user/backup_db.sh
-echo 'export MYSQL_PASSWORD="NoteApp2024!"' >> /home/ec2-user/.bashrc
+:
 
 # Setup daily backup cron job
 (crontab -l 2>/dev/null; echo "0 2 * * * /home/ec2-user/backup_db.sh") | crontab -
@@ -174,9 +120,7 @@ fi
 echo "🎉 Deployment completed!"
 echo ""
 echo "📋 Summary:"
-echo "- ✅ MariaDB installed and configured"
-echo "- ✅ Database 'noteapp' created"
-echo "- ✅ User 'noteapp' created with password 'NoteApp2024!'"
+echo "- ✅ SQLite configured (default)"
 echo "- ✅ Python app deployed with gunicorn"
 echo "- ✅ Systemd service 'noteapp' configured"
 echo "- ✅ Daily backups scheduled at 2 AM"

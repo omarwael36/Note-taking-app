@@ -1,0 +1,10 @@
+- hosts: noteapp_hosts
+  become: true
+  vars:
+    note_app_repo_url: "https://github.com/omarwael36/Note-taking-app.git"
+    note_app_repo_version: "main"
+    note_app_secret_key: "{{ lookup('ansible.builtin.password', '/dev/null length=32 chars=ascii_letters,digits') }}"
+  roles:
+    - note_app
+
+

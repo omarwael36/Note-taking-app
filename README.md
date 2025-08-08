@@ -1,13 +1,13 @@
 # 📝 Note Taking Web App
 
-A modern, responsive web application for creating and managing notes, built with Flask and designed for deployment on AWS EC2 with MariaDB.
+A modern, responsive web application for creating and managing notes, built with Flask. Uses SQLite by default and provides an Ansible role for deployment.
 
 ## 🚀 Features
 
 - ✅ Clean, responsive web interface
 - ✅ Create and store notes with timestamps
 - ✅ Real-time note display (newest first)
-- ✅ MariaDB/MySQL database support
+- ✅ SQLite by default (can switch via `DATABASE_URL`)
 - ✅ RESTful API endpoints
 - ✅ Modern Bootstrap UI with animations
 - ✅ Production-ready configuration
@@ -30,7 +30,21 @@ Note-taking-app/
 └── README.md               # This file
 ```
 
-## 🛠️ AWS EC2 Deployment Guide
+## 🛠️ Deployment with Ansible (recommended)
+
+This repo includes an Ansible role `note_app` to deploy the app with SQLite and systemd (Gunicorn). You can publish it to Ansible Galaxy.
+
+- Role path: `ansible/roles/note_app`
+- Example playbook: `ansible/site.yml`
+
+Run deployment:
+```bash
+ansible-playbook -i your_inventory ansible/site.yml
+```
+
+To publish to Galaxy, edit `ansible/roles/note_app/meta/main.yml` with your info, then build and publish the role.
+
+## 🛠️ AWS EC2 Deployment Guide (manual)
 
 ### Prerequisites
 - AWS Free Tier Account
@@ -52,32 +66,8 @@ sudo dnf install -y python3 python3-pip python3-devel git
 sudo dnf groupinstall -y "Development Tools"
 ```
 
-### Step 2: Install and Configure MariaDB
-
-```bash
-# Install MariaDB
-sudo dnf install -y mariadb-server mariadb-devel
-
-# Start and enable MariaDB
-sudo systemctl start mariadb
-sudo systemctl enable mariadb
-
-# Secure MariaDB installation
-sudo mysql_secure_installation
-# Follow prompts: set root password, remove anonymous users, etc.
-
-# Create database and user for the app
-sudo mysql -u root -p
-```
-
-```sql
--- In MySQL prompt:
-CREATE DATABASE noteapp;
-CREATE USER 'noteapp'@'localhost' IDENTIFIED BY 'your-secure-password';
-GRANT ALL PRIVILEGES ON noteapp.* TO 'noteapp'@'localhost';
-FLUSH PRIVILEGES;
-EXIT;
-```
+### Step 2: (Optional) Use a different database
+SQLite is used by default. To use another DB, set `DATABASE_URL` in `.env`.
 
 ### Step 3: Clone and Setup Application
 
@@ -103,27 +93,18 @@ nano .env
 ```
 
 ```env
-# Update with your settings
+# Update with your settings (SQLite default)
 SECRET_KEY=your-very-secure-secret-key-here
 FLASK_CONFIG=production
-MYSQL_HOST=localhost
-MYSQL_PORT=3306
-MYSQL_USER=noteapp
-MYSQL_PASSWORD=your-secure-password
-MYSQL_DATABASE=noteapp
+# DATABASE_URL=sqlite:////absolute/path/to/app.db  # optional override
 PORT=80
 ```
 
 ### Step 4: Initialize Database
 
 ```bash
-# Set Flask app
-export FLASK_APP=run.py
-
-# Initialize database migrations
-flask db init
-flask db migrate -m "Initial migration"
-flask db upgrade
+# Initialize SQLite tables (created on first run); to precreate:
+python run.py
 ```
 
 ### Step 5: Create and Mount Backup Volume
@@ -151,24 +132,19 @@ echo '/dev/xvdf /backup ext4 defaults,nofail 0 2' | sudo tee -a /etc/fstab
 sudo chown ec2-user:ec2-user /backup
 ```
 
-### Step 6: Setup Database Backup Script
+### Step 6: Setup Database Backup Script (SQLite)
 
 ```bash
-# Create backup script
 cat << 'EOF' > /home/ec2-user/backup_db.sh
 #!/bin/bash
 BACKUP_DIR="/backup"
 DATE=$(date +%Y%m%d_%H%M%S)
-DB_NAME="noteapp"
-DB_USER="noteapp"
-
-# Create backup
-mysqldump -u $DB_USER -p$MYSQL_PASSWORD $DB_NAME > $BACKUP_DIR/noteapp_backup_$DATE.sql
-
-# Keep only last 7 days of backups
-find $BACKUP_DIR -name "noteapp_backup_*.sql" -mtime +7 -delete
-
-echo "Backup completed: noteapp_backup_$DATE.sql"
+APP_DIR="/home/ec2-user/Note-taking-app"
+DB_FILE="$APP_DIR/app.db"
+mkdir -p "$BACKUP_DIR"
+cp "$DB_FILE" "$BACKUP_DIR/noteapp_backup_$DATE.sqlite"
+find "$BACKUP_DIR" -name "noteapp_backup_*.sqlite" -mtime +7 -delete
+echo "Backup completed: noteapp_backup_$DATE.sqlite"
 EOF
 
 chmod +x /home/ec2-user/backup_db.sh
@@ -268,7 +244,7 @@ python run.py
 
 - ✅ EC2 instance with RHEL 9
 - ✅ Python Flask web application
-- ✅ MariaDB database integration
+- ✅ SQLite database integration
 - ✅ Note creation and display functionality
 - ✅ Timestamp tracking
 - ✅ EBS backup volume mounted at `/backup`
@@ -285,10 +261,9 @@ python run.py
    sudo setcap 'cap_net_bind_service=+ep' /home/ec2-user/Note-taking-app/venv/bin/python3
    ```
 
-2. **Database Connection Issues**:
-   - Check MariaDB service: `sudo systemctl status mariadb`
-   - Verify credentials in `.env` file
-   - Test connection: `mysql -u noteapp -p noteapp`
+2. **Database Issues**:
+   - Ensure `app.db` exists and is writable by the service user
+   - If using a non-SQLite DB, verify `DATABASE_URL`
 
 3. **Application Won't Start**:
    - Check logs: `sudo journalctl -u noteapp -f`
@@ -304,5 +279,5 @@ python run.py
 
 For issues or questions about this deployment, check:
 - Application logs: `sudo journalctl -u noteapp`
-- Database logs: `sudo journalctl -u mariadb`
+- Database logs: not applicable for SQLite; app logs will show DB errors
 - System logs: `sudo journalctl`

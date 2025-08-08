@@ -1,0 +1,17 @@
+[Unit]
+Description=Note Taking App (Flask + Gunicorn)
+After=network.target
+
+[Service]
+User={{ note_app_user }}
+Group={{ note_app_group }}
+WorkingDirectory={{ note_app_base_dir }}/src
+Environment=PATH={{ note_app_venv_dir }}/bin
+Environment=FLASK_CONFIG={{ note_app_flask_config }}
+ExecStart={{ note_app_venv_dir }}/bin/gunicorn --workers 3 --bind {{ note_app_bind_host }}:{{ note_app_bind_port }} run:app
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+
+
