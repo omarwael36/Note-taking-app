@@ -18,11 +18,11 @@ A simple note-taking web application built with Python Flask and MySQL, containe
 ┌─────────────────┐    ┌─────────────────┐
 │   Web Service   │    │   DB Service    │
 │   (Flask App)   │◄──►│    (MySQL)      │
-│   Port: 5000    │    │   Port: 3306    │
+│   Port: 5000    │    │   Port: 3307    │
 └─────────────────┘    └─────────────────┘
          │                       │
          ▼                       ▼
-   Host Port: 3000         Named Volume
+   Host Port: 8080         Named Volume
                           (mysql_data)
 ```
 
@@ -88,14 +88,14 @@ This command will:
 
 ### 4. Access the Application
 
-- **Web Interface**: http://localhost:3000
-- **Health Check**: http://localhost:3000/healthz
+- **Web Interface**: http://localhost:8080
+- **Health Check**: http://localhost:8080/healthz
 
 ## 🧪 Testing the Application
 
 ### Web Interface Testing
 
-1. Open http://localhost:3000 in your browser
+1. Open http://localhost:8080 in your browser
 2. Enter a note like "Buy milk" and click "Add Note"
 3. Verify the note appears in the list with a timestamp
 
@@ -103,18 +103,18 @@ This command will:
 
 ```bash
 # Check health
-curl http://localhost:3000/healthz
+curl http://localhost:8080/healthz
 
 # Get all notes
-curl http://localhost:3000/notes
+curl http://localhost:8080/notes
 
 # Create a note via API
 curl -X POST -H "Content-Type: application/json" \
      -d '{"content":"API test note"}' \
-     http://localhost:3000/notes
+     http://localhost:8080/notes
 
 # Get notes again to see the new note
-curl http://localhost:3000/notes
+curl http://localhost:8080/notes
 ```
 
 Expected API responses:
@@ -240,7 +240,7 @@ Note-taking-app/
 
 1. **Check database health:**
    ```bash
-   curl http://localhost:3000/healthz
+   curl http://localhost:8080/healthz
    ```
 
 2. **Verify database is running:**
@@ -256,13 +256,13 @@ Note-taking-app/
 
 ### Port Already in Use
 
-If port 3000 is already in use, edit `docker-compose.yml`:
+If port 8080 is already in use, edit `docker-compose.yml`:
 
 ```yaml
 services:
   web:
     ports:
-      - "8080:5000"  # Change host port to 8080
+      - "9000:5000"  # Change host port to 9000
 ```
 
 ### Container Build Issues
@@ -322,7 +322,7 @@ For issues or questions:
 
 1. Check the troubleshooting section above
 2. View application logs: `docker-compose logs -f`
-3. Check service health: `curl http://localhost:3000/healthz`
+3. Check service health: `curl http://localhost:8080/healthz`
 4. Verify database connectivity: `docker-compose exec db mysql -u noteapp -p`
 
 ## 📄 License
