@@ -1,283 +1,330 @@
-# 📝 Note Taking Web App
+# 📝 Flask Notes Webapp
 
-A modern, responsive web application for creating and managing notes, built with Flask. Uses SQLite by default and provides an Ansible role for deployment.
+A simple note-taking web application built with Python Flask and MySQL, containerized with Docker and orchestrated with Docker Compose.
 
 ## 🚀 Features
 
-- ✅ Clean, responsive web interface
-- ✅ Create and store notes with timestamps
-- ✅ Real-time note display (newest first)
-- ✅ SQLite by default (can switch via `DATABASE_URL`)
-- ✅ RESTful API endpoints
-- ✅ Modern Bootstrap UI with animations
-- ✅ Production-ready configuration
+- ✅ Clean, responsive web interface for creating and viewing notes
+- ✅ RESTful API endpoints for programmatic access
+- ✅ MySQL database with persistent storage
+- ✅ Health check endpoint for monitoring
+- ✅ Docker containerization with non-root user
+- ✅ Docker Compose orchestration with health checks
+- ✅ Environment-based configuration
 
-## 🏗️ Application Structure
+## 🏗️ Architecture
 
 ```
-Note-taking-app/
-├── app/
-│   ├── __init__.py          # Flask app factory
-│   ├── models.py            # Database models
-│   ├── routes.py            # Application routes
-│   └── templates/
-│       ├── base.html        # Base template
-│       └── index.html       # Main page
-├── config.py                # Configuration settings
-├── run.py                   # Application entry point
-├── requirements.txt         # Python dependencies
-├── env.example              # Environment variables template
-└── README.md               # This file
+┌─────────────────┐    ┌─────────────────┐
+│   Web Service   │    │   DB Service    │
+│   (Flask App)   │◄──►│    (MySQL)      │
+│   Port: 5000    │    │   Port: 3306    │
+└─────────────────┘    └─────────────────┘
+         │                       │
+         ▼                       ▼
+   Host Port: 3000         Named Volume
+                          (mysql_data)
 ```
 
-## 🛠️ Deployment with Ansible (recommended)
+## 📋 API Endpoints
 
-This repo includes an Ansible role `note_app` to deploy the app with SQLite and systemd (Gunicorn). You can publish it to Ansible Galaxy.
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/` | Homepage with note form and list |
+| GET | `/notes` | Get all notes as JSON |
+| POST | `/notes` | Create a new note |
+| GET | `/healthz` | Health check endpoint |
 
-- Role path: `ansible/roles/note_app`
-- Example playbook: `ansible/site.yml`
-
-Run deployment:
-```bash
-ansible-playbook -i your_inventory ansible/site.yml
-```
-
-To publish to Galaxy, edit `ansible/roles/note_app/meta/main.yml` with your info, then build and publish the role.
-
-## 🛠️ AWS EC2 Deployment Guide (manual)
+## 🛠️ Quick Start
 
 ### Prerequisites
-- AWS Free Tier Account
-- EC2 instance (Red Hat Enterprise Linux 9, t2.micro)
-- Security Groups: ports 22 (SSH), 80 (HTTP)
-- SSH key pair
 
-### Step 1: Prepare EC2 Instance
+- Docker and Docker Compose v2
+- Git
+
+### 1. Clone the Repository
 
 ```bash
-# Connect to your EC2 instance
-ssh -i your-key.pem ec2-user@your-ec2-ip
-
-# Update system packages
-sudo dnf update -y
-
-# Install Python 3.9+ and development tools
-sudo dnf install -y python3 python3-pip python3-devel git
-sudo dnf groupinstall -y "Development Tools"
+git clone https://github.com/omarwael36/Note-taking-app.git
+cd Note-taking-app
 ```
 
-### Step 2: (Optional) Use a different database
-SQLite is used by default. To use another DB, set `DATABASE_URL` in `.env`.
-
-### Step 3: Clone and Setup Application
+### 2. Configure Environment
 
 ```bash
-# Clone the repository
-git clone <your-repo-url>
-cd Note-taking-app
-
-# Create virtual environment
-python3 -m venv venv
-source venv/bin/activate
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Copy and configure environment variables
 cp env.example .env
 ```
 
-Edit `.env` file:
-```bash
-nano .env
-```
+Edit `.env` file with your preferred settings:
 
 ```env
-# Update with your settings (SQLite default)
-SECRET_KEY=your-very-secure-secret-key-here
+# Flask Configuration
+SECRET_KEY=your-very-secure-secret-key-change-this-in-production
 FLASK_CONFIG=production
-# DATABASE_URL=sqlite:////absolute/path/to/app.db  # optional override
-PORT=80
+
+# MySQL Database Configuration
+MYSQL_ROOT_PASSWORD=secure-root-password-123
+MYSQL_DATABASE=noteapp
+MYSQL_USER=noteapp
+MYSQL_PASSWORD=secure-user-password-456
+
+# Server Configuration
+PORT=5000
+HOST=0.0.0.0
 ```
 
-### Step 4: Initialize Database
+### 3. Start the Application
 
 ```bash
-# Initialize SQLite tables (created on first run); to precreate:
-python run.py
+docker-compose up -d
 ```
 
-### Step 5: Create and Mount Backup Volume
+This command will:
+- Build the Flask application container
+- Pull the MySQL 8.0 image
+- Create a named volume for database persistence
+- Start both services with health checks
+- Wait for the database to be ready before starting the web app
 
-```bash
-# Create EBS volume from AWS Console (e.g., 8GB)
-# Attach it to your EC2 instance
+### 4. Access the Application
 
-# Find the new device (usually /dev/xvdf or /dev/nvme1n1)
-lsblk
-
-# Format the volume (replace /dev/xvdf with your device)
-sudo mkfs -t ext4 /dev/xvdf
-
-# Create mount point
-sudo mkdir /backup
-
-# Mount the volume
-sudo mount /dev/xvdf /backup
-
-# Add to fstab for permanent mounting
-echo '/dev/xvdf /backup ext4 defaults,nofail 0 2' | sudo tee -a /etc/fstab
-
-# Set permissions
-sudo chown ec2-user:ec2-user /backup
-```
-
-### Step 6: Setup Database Backup Script (SQLite)
-
-```bash
-cat << 'EOF' > /home/ec2-user/backup_db.sh
-#!/bin/bash
-BACKUP_DIR="/backup"
-DATE=$(date +%Y%m%d_%H%M%S)
-APP_DIR="/home/ec2-user/Note-taking-app"
-DB_FILE="$APP_DIR/app.db"
-mkdir -p "$BACKUP_DIR"
-cp "$DB_FILE" "$BACKUP_DIR/noteapp_backup_$DATE.sqlite"
-find "$BACKUP_DIR" -name "noteapp_backup_*.sqlite" -mtime +7 -delete
-echo "Backup completed: noteapp_backup_$DATE.sqlite"
-EOF
-
-chmod +x /home/ec2-user/backup_db.sh
-
-# Add to crontab for daily backups at 2 AM
-(crontab -l 2>/dev/null; echo "0 2 * * * /home/ec2-user/backup_db.sh") | crontab -
-```
-
-### Step 7: Deploy Application
-
-```bash
-# Test the application
-python run.py
-
-# For production, use gunicorn
-pip install gunicorn
-
-# Create systemd service
-sudo tee /etc/systemd/system/noteapp.service > /dev/null << EOF
-[Unit]
-Description=Note Taking App
-After=network.target
-
-[Service]
-User=ec2-user
-WorkingDirectory=/home/ec2-user/Note-taking-app
-Environment=PATH=/home/ec2-user/Note-taking-app/venv/bin
-ExecStart=/home/ec2-user/Note-taking-app/venv/bin/gunicorn --workers 3 --bind 0.0.0.0:80 run:app
-Restart=always
-
-[Install]
-WantedBy=multi-user.target
-EOF
-
-# Enable and start the service
-sudo systemctl daemon-reload
-sudo systemctl enable noteapp
-sudo systemctl start noteapp
-
-# Check status
-sudo systemctl status noteapp
-```
+- **Web Interface**: http://localhost:3000
+- **Health Check**: http://localhost:3000/healthz
 
 ## 🧪 Testing the Application
 
-1. **Web Interface**: Navigate to `http://your-ec2-public-ip`
-2. **Create a Note**: Use the form to add a note like "Don't forget to review the IAM policy lecture notes."
-3. **Verify Display**: Check that notes appear with timestamps in descending order
-4. **API Testing**:
-   ```bash
-   # Get all notes
-   curl http://your-ec2-public-ip/api/notes
-   
-   # Create a note via API
-   curl -X POST -H "Content-Type: application/json" \
-        -d '{"content":"API test note"}' \
-        http://your-ec2-public-ip/api/notes
-   ```
+### Web Interface Testing
 
-## 🔧 Local Development
+1. Open http://localhost:3000 in your browser
+2. Enter a note like "Buy milk" and click "Add Note"
+3. Verify the note appears in the list with a timestamp
+
+### API Testing
 
 ```bash
-# Clone repository
-git clone <repo-url>
-cd Note-taking-app
+# Check health
+curl http://localhost:3000/healthz
 
-# Create virtual environment
-python3 -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
+# Get all notes
+curl http://localhost:3000/notes
 
-# Install dependencies
-pip install -r requirements.txt
+# Create a note via API
+curl -X POST -H "Content-Type: application/json" \
+     -d '{"content":"API test note"}' \
+     http://localhost:3000/notes
 
-# Run with SQLite (development)
-python run.py
-
-# Access at http://localhost:5000
+# Get notes again to see the new note
+curl http://localhost:3000/notes
 ```
+
+Expected API responses:
+
+```json
+# GET /notes
+[
+  {
+    "id": 1,
+    "content": "Buy milk",
+    "created_at": "2025-01-12T18:00:00Z"
+  }
+]
+
+# POST /notes (201 Created)
+{
+  "id": 2,
+  "content": "API test note",
+  "created_at": "2025-01-12T18:05:00Z"
+}
+
+# GET /healthz (200 OK when healthy)
+{
+  "status": "healthy",
+  "database": "connected",
+  "timestamp": "2025-01-12T18:00:00Z"
+}
+```
+
+## 🔧 Development Commands
+
+### View Logs
+
+```bash
+# All services
+docker-compose logs -f
+
+# Web service only
+docker-compose logs -f web
+
+# Database service only
+docker-compose logs -f db
+```
+
+### Stop the Application
+
+```bash
+docker-compose down
+```
+
+### Stop and Remove Data
+
+```bash
+docker-compose down -v
+```
+
+### Rebuild After Code Changes
+
+```bash
+docker-compose up --build
+```
+
+### Access Database Directly
+
+```bash
+docker-compose exec db mysql -u noteapp -p noteapp
+```
+
+## 📁 Project Structure
+
+```
+Note-taking-app/
+├── app/                    # Flask application package
+│   ├── __init__.py        # App factory
+│   ├── models.py          # Database models
+│   ├── routes.py          # Application routes
+│   ├── templates/         # HTML templates
+│   │   ├── base.html      # Base template
+│   │   └── index.html     # Main page
+│   └── static/            # CSS/JS assets
+├── db/                    # Database initialization
+│   └── init/              # SQL init scripts
+│       └── 01_create_tables.sql
+├── config.py              # Configuration settings
+├── run.py                 # Application entry point
+├── requirements.txt       # Python dependencies
+├── Dockerfile            # Flask app container
+├── docker-compose.yml    # Multi-container orchestration
+├── .env.example          # Environment variables template
+├── .dockerignore         # Docker build exclusions
+└── README.md             # This file
+```
+
+## 🔒 Security Features
+
+- ✅ Non-root user in Docker container
+- ✅ Environment-based configuration (no hardcoded secrets)
+- ✅ Input validation for note content
+- ✅ MySQL user with limited privileges
+- ✅ Network isolation via Docker networks
+
+## 🚨 Troubleshooting
+
+### Application Won't Start
+
+1. **Check service status:**
+   ```bash
+   docker-compose ps
+   ```
+
+2. **View logs:**
+   ```bash
+   docker-compose logs web
+   docker-compose logs db
+   ```
+
+3. **Verify environment variables:**
+   ```bash
+   cat .env
+   ```
+
+### Database Connection Issues
+
+1. **Check database health:**
+   ```bash
+   curl http://localhost:3000/healthz
+   ```
+
+2. **Verify database is running:**
+   ```bash
+   docker-compose exec db mysqladmin ping -h localhost -u root -p
+   ```
+
+3. **Reset database:**
+   ```bash
+   docker-compose down -v
+   docker-compose up -d
+   ```
+
+### Port Already in Use
+
+If port 3000 is already in use, edit `docker-compose.yml`:
+
+```yaml
+services:
+  web:
+    ports:
+      - "8080:5000"  # Change host port to 8080
+```
+
+### Container Build Issues
+
+1. **Clean build:**
+   ```bash
+   docker-compose build --no-cache
+   ```
+
+2. **Check Docker resources:**
+   ```bash
+   docker system df
+   docker system prune
+   ```
 
 ## 📊 Database Schema
 
 ### Notes Table
-- `id`: Primary key (INTEGER)
-- `content`: Note content (TEXT)
-- `timestamp`: Creation timestamp (DATETIME)
 
-## 🔒 Security Considerations
+| Column | Type | Description |
+|--------|------|-------------|
+| `id` | INT AUTO_INCREMENT | Primary key |
+| `content` | TEXT | Note content (required) |
+| `created_at` | TIMESTAMP | Creation timestamp |
 
-- Change default passwords
-- Use strong SECRET_KEY
-- Configure firewall properly
-- Regular security updates
-- Enable SSL/TLS in production
-- Regular database backups
+## 🔄 Data Persistence
 
-## 🏆 Project Completion Checklist
+- Database data is stored in a named Docker volume: `mysql_data`
+- Data persists between container restarts
+- To completely reset data: `docker-compose down -v`
 
-- ✅ EC2 instance with RHEL 9
-- ✅ Python Flask web application
-- ✅ SQLite database integration
-- ✅ Note creation and display functionality
-- ✅ Timestamp tracking
-- ✅ EBS backup volume mounted at `/backup`
-- ✅ Automated backup script
-- ✅ Production deployment with systemd
-- ✅ Security groups (ports 22, 80)
+## 📈 Monitoring
 
-## 🚨 Troubleshooting
+### Health Checks
 
-### Common Issues:
+Both services include health checks:
 
-1. **Permission Denied on Port 80**:
-   ```bash
-   sudo setcap 'cap_net_bind_service=+ep' /home/ec2-user/Note-taking-app/venv/bin/python3
-   ```
+- **Web service**: Checks `/healthz` endpoint every 30 seconds
+- **Database service**: Checks MySQL ping every 10 seconds
 
-2. **Database Issues**:
-   - Ensure `app.db` exists and is writable by the service user
-   - If using a non-SQLite DB, verify `DATABASE_URL`
+### Service Dependencies
 
-3. **Application Won't Start**:
-   - Check logs: `sudo journalctl -u noteapp -f`
-   - Verify virtual environment activation
-   - Check file permissions
+The web service waits for the database to be healthy before starting, ensuring proper startup order.
 
-4. **Backup Issues**:
-   - Verify EBS volume mounting: `df -h`
-   - Check backup script permissions: `ls -la backup_db.sh`
-   - Test manual backup: `./backup_db.sh`
+## 🚀 Production Considerations
+
+1. **Use stronger passwords** in production `.env`
+2. **Enable SSL/TLS** with a reverse proxy (nginx, Traefik)
+3. **Set up log aggregation** for monitoring
+4. **Configure backup strategy** for the MySQL volume
+5. **Use Docker secrets** instead of environment variables for sensitive data
+6. **Set resource limits** in docker-compose.yml
 
 ## 📞 Support
 
-For issues or questions about this deployment, check:
-- Application logs: `sudo journalctl -u noteapp`
-- Database logs: not applicable for SQLite; app logs will show DB errors
-- System logs: `sudo journalctl`
+For issues or questions:
+
+1. Check the troubleshooting section above
+2. View application logs: `docker-compose logs -f`
+3. Check service health: `curl http://localhost:3000/healthz`
+4. Verify database connectivity: `docker-compose exec db mysql -u noteapp -p`
+
+## 📄 License
+
+This project is open source and available under the [MIT License](LICENSE).

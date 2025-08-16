@@ -8,24 +8,27 @@ class Config:
     # Flask configuration
     SECRET_KEY = os.environ.get('SECRET_KEY') or 'dev-secret-key-change-in-production'
     
-    # Database configuration (SQLite default; override via DATABASE_URL)
+    # Database configuration
+    MYSQL_HOST = os.environ.get('MYSQL_HOST') or 'localhost'
+    MYSQL_PORT = int(os.environ.get('MYSQL_PORT') or 3306)
+    MYSQL_USER = os.environ.get('MYSQL_USER') or 'noteapp'
+    MYSQL_PASSWORD = os.environ.get('MYSQL_PASSWORD') or 'password'
+    MYSQL_DATABASE = os.environ.get('MYSQL_DATABASE') or 'noteapp'
+    
+    # URL encode the password to handle special characters like @
+    from urllib.parse import quote_plus
+    encoded_password = quote_plus(MYSQL_PASSWORD)
+    
     SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or \
-        'sqlite:///' + os.path.join(basedir, 'app.db')
+        f'mysql+pymysql://{MYSQL_USER}:{encoded_password}@{MYSQL_HOST}:{MYSQL_PORT}/{MYSQL_DATABASE}'
     
     SQLALCHEMY_TRACK_MODIFICATIONS = False
-    
-    # To use other DBs (e.g., MariaDB/Postgres), set DATABASE_URL accordingly
 
 class DevelopmentConfig(Config):
     DEBUG = True
-    # Force SQLite for development
-    SQLALCHEMY_DATABASE_URI = 'sqlite:///' + os.path.join(basedir, 'app.db')
 
 class ProductionConfig(Config):
     DEBUG = False
-    # Default to SQLite for production as well; can be overridden via DATABASE_URL
-    SQLALCHEMY_DATABASE_URI = os.environ.get('DATABASE_URL') or \
-        'sqlite:///' + os.path.join(basedir, 'app.db')
 
 class TestingConfig(Config):
     TESTING = True

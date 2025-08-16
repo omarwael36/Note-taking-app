@@ -1,91 +1,33 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="main-card">
-    <h2 class="mb-4">
-        <i class="fas fa-edit"></i> Write a New Note
-    </h2>
+<div class="note-form">
+    <h2>✍️ Add a New Note</h2>
     
-    <form method="POST" id="noteForm">
-        <div class="mb-3">
-            <label for="content" class="form-label">Your Note:</label>
-            <textarea 
-                class="form-control note-textarea" 
-                id="content" 
-                name="content" 
-                rows="4" 
-                placeholder="Write your note here... (e.g., Don't forget to review the IAM policy lecture notes.)"
-                required
-            ></textarea>
-        </div>
-        <div class="d-grid d-md-flex justify-content-md-end">
-            <button type="submit" class="btn btn-primary">
-                <i class="fas fa-save"></i> Save Note
-            </button>
-        </div>
+    <form method="POST">
+        <textarea 
+            name="content" 
+            placeholder="Write your note here... (e.g., Buy milk, Review meeting notes, etc.)"
+            required
+        ></textarea>
+        <button type="submit" class="btn">Add Note</button>
     </form>
 </div>
 
-<div class="main-card">
-    <h2 class="mb-4">
-        <i class="fas fa-list"></i> Your Notes
-        {% if notes %}
-            <span class="badge bg-secondary ms-2">{{ notes|length }}</span>
-        {% endif %}
-    </h2>
+<div class="notes-list">
+    <h2>📋 Your Notes ({{ notes|length }})</h2>
     
     {% if notes %}
-        <div id="notesList">
-            {% for note in notes %}
-                <div class="note-item p-3 mb-3">
-                    <div class="d-flex justify-content-between align-items-start mb-2">
-                        <div class="note-timestamp">
-                            <i class="fas fa-clock"></i> 
-                            {{ note.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}
-                        </div>
-                    </div>
-                    <div class="note-content">
-                        <i class="fas fa-sticky-note text-primary me-2"></i>
-                        {{ note.content }}
-                    </div>
-                </div>
-            {% endfor %}
-        </div>
+        {% for note in notes %}
+            <div class="note-item">
+                <div class="note-content">{{ note.content }}</div>
+                <div class="note-timestamp">{{ note.created_at.strftime('%Y-%m-%d %H:%M:%S') }}</div>
+            </div>
+        {% endfor %}
     {% else %}
-        <div class="no-notes">
-            <i class="fas fa-clipboard fa-3x mb-3"></i>
-            <p>No notes yet. Start writing your first note above!</p>
+        <div class="empty-state">
+            <p>No notes yet. Add your first note above! 👆</p>
         </div>
     {% endif %}
 </div>
-{% endblock %}
-
-{% block scripts %}
-<script>
-    // Auto-resize textarea
-    const textarea = document.getElementById('content');
-    textarea.addEventListener('input', function() {
-        this.style.height = 'auto';
-        this.style.height = this.scrollHeight + 'px';
-    });
-    
-    // Focus on textarea when page loads
-    window.addEventListener('load', function() {
-        textarea.focus();
-    });
-    
-    // Add some interactivity to note items
-    document.addEventListener('DOMContentLoaded', function() {
-        const noteItems = document.querySelectorAll('.note-item');
-        noteItems.forEach(item => {
-            item.addEventListener('mouseenter', function() {
-                this.style.backgroundColor = '#e3f2fd';
-                this.style.transition = 'background-color 0.3s ease';
-            });
-            item.addEventListener('mouseleave', function() {
-                this.style.backgroundColor = '#f8f9fa';
-            });
-        });
-    });
-</script>
 {% endblock %} 
